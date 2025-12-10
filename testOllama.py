@@ -3,7 +3,7 @@ import json
 
 url = "http://localhost:11434/api/generate"
 payload = {
-    "model": "llama3.1:8b",  # must match the model you pulled
+    "model": "gpt-oss:20b",  # must match the model you pulled
     "prompt": "Give me a one-sentence summary of general relativity."
 }
 
