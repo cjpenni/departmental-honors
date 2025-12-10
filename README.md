@@ -2,6 +2,7 @@
 
 ## Setting up Env
 run `conda env create -n myenv`
+if running on palmetto cluster `sbatch install_torch.sh`
 then `pip install -r requirements.txt`
 
 ## Setting up gpt-oss-20b
