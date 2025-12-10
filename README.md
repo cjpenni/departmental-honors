@@ -1,13 +1,14 @@
 # departmental-honors
 
 ## Setting up Env
-run `conda env create -f environment.yml -n myenv`
+run `conda env create -n myenv`
+then `pip install -r requirements.txt`
 
-## Setting up Llama 3.1
+## Setting up gpt-oss-20b
 ### Steps:
 - run `apptainer build ollama.sif docker://ollama/ollama`
 - run `ollama serve`
-- in a separate terminal run `ollama pull llama3.1:8b`
+- in a separate terminal run `ollama pull gpt-oss:20b`
 - kill ollama serve
 - run `apptainer run --nv --bind /home/<your_username>:/root/.ollama ollama.sif`
-- run the `testLlama.py` script to test your setup works.
+- run the `testOllama.py` script to test your setup works.
