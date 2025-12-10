@@ -13,3 +13,13 @@
 - kill ollama serve
 - run `apptainer run --nv --bind /home/<your_username>:/root/.ollama ollama.sif`
 - run the `testOllama.py` script to test your setup works.
+
+## rag_pipeline
+Contains instructions and code for:
+- Downloading and Cleaning Amazon data
+- Setting up Embeddings and Indexing
+
+## data_pipeline
+Contains instructions and code for:
+- Running the data pipeline
+- Displaying the visualization
