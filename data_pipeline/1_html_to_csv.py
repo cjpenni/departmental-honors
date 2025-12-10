@@ -6,9 +6,9 @@ from boxsdk import Client, OAuth2
 
 # ---- BOX CONFIG ----
 # Replace with your Box developer token
-BOX_DEVELOPER_TOKEN = '78ZBmOOmDYcx0lL5CMpcGGSQDzktxjFX'
-BOX_FOLDER_ID = '342315099846'  # e.g., '123456789'
-LOCAL_OUTPUT_DIR = '/scratch/cjpenni/departmental-honors/data_pipeline/html_to_csv_output'
+BOX_DEVELOPER_TOKEN = '' # these are only valid for 60 minutes
+BOX_FOLDER_ID = ''  # e.g., '123456789' you can find this in the url of the box folder you want to access
+LOCAL_OUTPUT_DIR = '/scratch/cjpenni/departmental-honors/data_pipeline/html_to_csv_output' #change to match your file structure
 os.makedirs(LOCAL_OUTPUT_DIR, exist_ok=True)
 # ---------------------
 
