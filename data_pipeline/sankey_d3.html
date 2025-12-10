@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script src="https://unpkg.com/d3-sankey@0.12.3/dist/d3-sankey.min.js"></script>
+<style>
+ body { 
+   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+   margin: 0;
+   padding: 20px;
+   background: #f5f5f5;
+ }
+ 
+ .filters-container {
+   background: white;
+   padding: 24px;
+   border-radius: 8px;
+   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+   margin-bottom: 20px;
+ }
+ 
+ .filters-grid {
+   display: grid;
+   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+   gap: 20px;
+ }
+ 
+ .filter-group {
+   display: flex;
+   flex-direction: column;
+   gap: 8px;
+ }
+ 
+ .filter-group label {
+   font-weight: 600;
+   font-size: 14px;
+   color: #333;
+ }
+ 
+ select {
+   padding: 10px 12px;
+   border: 2px solid #e0e0e0;
+   border-radius: 6px;
+   font-size: 14px;
+   background: white;
+   color: #333;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   font-family: inherit;
+ }
+ 
+ select:hover {
+   border-color: #b0b0b0;
+ }
+ 
+ select:focus {
+   outline: none;
+   border-color: #4682b4;
+   box-shadow: 0 0 0 3px rgba(70, 130, 180, 0.1);
+ }
+ 
+ select[multiple] {
+   min-height: 120px;
+ }
+ 
+ #chart { 
+   width: 100%; 
+   height: 900px;
+   background: white;
+   border-radius: 8px;
+   box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+ }
+</style>
+</head>
+<body>
+<div class="filters-container">
+  <div class="filters-grid">
+    <div class="filter-group">
+      <label for="categoryFilter">Inference Category</label>
+      <select id="categoryFilter"></select>
+    </div>
+    
+    <div class="filter-group">
+      <label for="sourceFilter">Data Source (Ctrl/Cmd + Click for multiple)</label>
+      <select id="sourceFilter" multiple size="4"></select>
+    </div>
+    
+    <div class="filter-group">
+      <label for="sensitivityFilter">Sensitivity</label>
+      <select id="sensitivityFilter"></select>
+    </div>
+    
+    <div class="filter-group">
+      <label for="commonnessFilter">Uncommonness Scores</label>
+      <select id="commonnessFilter"></select>
+    </div>
+  </div>
+</div>
+
+<svg id="chart" width="1200" height="900"></svg>
+
+<script>
+// CSV location
+const csvPath = "unified_output.csv";
+
+// Map of displayed source labels -> actual CSV combined_col values
+const sourceMapping = [
+  { label: 'Browser History', value: 'Browser_history' },
+  { label: 'Location History', value: 'Location_history' },
+  { label: 'Google Search History', value: 'Google_search_history' },
+  { label: 'YouTube Search History', value: 'YT_search_history' }
+];
+
+// Create a lookup map: CSV value -> Display label
+const sourceDisplayMap = new Map(
+  sourceMapping.map(s => [s.value, s.label])
+);
+
+// Define color mapping for source nodes (using CSV values as keys)
+const sourceColors = {
+  'YT_search_history': '#e74c3c',      // Red
+  'Browser_history': '#3498db',        // Blue
+  'Location_history': '#2ecc71',       // Green
+  'Google_search_history': '#f39c12'   // Orange
+};
+
+// Helper function to truncate text
+function truncateText(text, maxLength = 80) {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength) + '...';
+}
+
+// Helper function to capitalize first letter
+function capitalizeFirstLetter(text) {
+  if (!text || text.length === 0) return text;
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+// Helper function to get display name for source
+function getSourceDisplayName(sourceValue) {
+  return sourceDisplayMap.get(sourceValue) || sourceValue;
+}
+
+// Load CSV
+Promise.all([
+  fetch(csvPath).then(r => r.text())
+]).then(([csvText]) => {
+  const data = d3.csvParse(csvText);
+
+  // Extract unique filters
+  const categories = Array.from(new Set(data.map(d => d.category))).sort();
+  // sensitivity and uncommonness values (CSV stores them as strings)
+  const sensitivities = Array.from(new Set(data.map(d => d.sensitivity))).sort((a,b)=>Number(a)-Number(b));
+  const uncommonnesses = Array.from(new Set(data.map(d => d.uncommonness))).sort((a,b)=>Number(a)-Number(b));
+  
+  // Populate dropdowns
+  const categoryFilter = d3.select('#categoryFilter');
+  categoryFilter.append('option').attr('value', 'All').text('All').property('selected', true);
+  categories.forEach(c => categoryFilter.append('option').attr('value', c).text(c));
+  
+  const sourceFilter = d3.select('#sourceFilter');
+  // default to "All"
+  sourceFilter.append('option').attr('value', 'All').text('All').property('selected', true);
+  sourceMapping.forEach(s => sourceFilter.append('option').attr('value', s.value).text(s.label));
+  
+  // Sensitivity filter (single-select)
+  const sensitivityFilter = d3.select('#sensitivityFilter');
+  sensitivityFilter.append('option').attr('value', 'All').text('All').property('selected', true);
+  sensitivities.forEach(v => sensitivityFilter.append('option').attr('value', v).text(v));
+  
+  // Commonness filter (we use the CSV column 'uncommonness' but label as Commonness)
+  const commonnessFilter = d3.select('#commonnessFilter');
+  commonnessFilter.append('option').attr('value', 'All').text('All').property('selected', true);
+  uncommonnesses.forEach(v => commonnessFilter.append('option').attr('value', v).text(v));
+  
+  categoryFilter.on('change', update);
+  sourceFilter.on('change', update);
+  sensitivityFilter.on('change', update);
+  commonnessFilter.on('change', update);
+ 
+  function update() {
+    const cat = categoryFilter.property('value');
+    const sens = d3.select('#sensitivityFilter').property('value');
+    const common = d3.select('#commonnessFilter').property('value');
+    // Support multiple source selections
+    const selectedSrcOpts = Array.from(sourceFilter.node().selectedOptions || []).map(o => o.value);
+    const srcAllSelected = selectedSrcOpts.length === 0 || selectedSrcOpts.includes('All');
+ 
+    let filtered = data;
+    if (cat !== 'All') filtered = filtered.filter(d => d.category === cat);
+    if (sens !== 'All') filtered = filtered.filter(d => d.sensitivity === sens);
+    if (common !== 'All') filtered = filtered.filter(d => d.uncommonness === common);
+    if (!srcAllSelected) {
+      // Keep rows that:
+      // - have a single source and that source is selected
+      // - OR have multiple sources and ALL of those sources are selected
+      filtered = filtered.filter(d => {
+        const rowSources = d.combined_col.split(/\s+AND\s+/i).map(s => s.trim());
+        if (rowSources.length <= 1) {
+          return selectedSrcOpts.includes(rowSources[0]);
+        }
+        return rowSources.every(s => selectedSrcOpts.includes(s));
+      });
+    }
+ 
+    // Build Sankey structure
+    const nodes = [];
+    const nodeMap = new Map();
+    const links = [];
+ 
+    function addNode(name, layer, fullName = name, csvValue = null) {
+      // For recommendations, always use the same layer/key
+      const key = layer === 'recommendation' ? `recommendation:${name}` : `${layer}:${name}`;
+      if (!nodeMap.has(key)) {
+        const nodeIndex = nodes.length;
+        // Store layer, full name, and CSV value in the node object
+        nodes.push({ name, layer, nodeId: nodeIndex, fullName, csvValue });
+        nodeMap.set(key, nodeIndex);
+      }
+      return nodeMap.get(key);
+    }
+ 
+    filtered.forEach(row => {
+      // Split sources by " AND " → into individual sources
+      const rowSources = row.combined_col.split(/\s+AND\s+/i).map(s => s.trim());
+ 
+      // Capitalize first letter of inference
+      const capitalizedInference = capitalizeFirstLetter(row.inference);
+      const infNode = addNode(capitalizedInference, 'inference');
+      
+      // Truncate recommendation for display, but keep full name for tooltip
+      const fullRecommendation = row.recommended_product;
+      const truncatedRecommendation = truncateText(fullRecommendation, 80);
+      const recNode = addNode(truncatedRecommendation, 'recommendation', fullRecommendation);
+ 
+      // At this point `filtered` already enforces the AND-rule for multi-source rows,
+      // so include all rowSources (or all when "All" is active).
+      const includedSources = rowSources;
+ 
+      // Each selected source becomes its own node → connects to inference
+      includedSources.forEach(src => {
+        // Convert CSV value to display name for the node
+        const displayName = getSourceDisplayName(src);
+        const srcNode = addNode(displayName, 'source', displayName, src);
+        links.push({ source: srcNode, target: infNode, value: 1 });
+      });
+ 
+      // Inference → Recommendation link (keep if inference was connected to at least one selected source)
+      if (includedSources.length > 0) {
+        links.push({ source: infNode, target: recNode, value: 1 });
+      }
+    });
+
+    drawSankey({ nodes, links });
+  }
+
+  function drawSankey(graph) {
+    d3.select('#chart').selectAll('*').remove();
+
+    const svg = d3.select('#chart');
+    const { width, height } = svg.node().getBoundingClientRect();
+
+    // Add padding to prevent text cutoff
+    const padding = { top: 30, right: 20, bottom: 30, left: 190 };
+
+    const sankey = d3.sankey()
+      .nodeWidth(20)
+      .nodePadding(20)
+      .extent([
+        [padding.left, padding.top], 
+        [width - padding.right, height - padding.bottom]
+      ]);
+
+    // Store the original layer information before sankey transforms it
+    const layerMap = new Map();
+    graph.nodes.forEach((node, i) => {
+      layerMap.set(i, { 
+        layer: node.layer, 
+        name: node.name, 
+        fullName: node.fullName,
+        csvValue: node.csvValue 
+      });
+    });
+
+    const { nodes, links } = sankey({ 
+      nodes: graph.nodes.map(d => ({ ...d })), 
+      links: graph.links.map(d => ({ ...d })) 
+    });
+
+    // Re-attach layer information after sankey processing
+    nodes.forEach((node, i) => {
+      const original = layerMap.get(node.index);
+      if (original) {
+        node.layer = original.layer;
+        node.fullName = original.fullName || original.name;
+        node.csvValue = original.csvValue;
+      }
+    });
+
+    const minX = d3.min(nodes, d => d.x0);
+    const maxX = d3.max(nodes, d => d.x1);
+    const sankeyWidth = maxX - minX;
+
+    const scaleX = Math.min(1, (width - padding.left - padding.right) / sankeyWidth);
+
+    const scaledGroup = svg.append("g")
+      .attr("transform", `scale(${scaleX},1)`);
+
+    // Draw links FIRST (so they appear behind everything else)
+    scaledGroup.append('g')
+      .attr('fill', 'none')
+      .selectAll('path')
+      .data(links)
+      .enter().append('path')
+        .attr('d', d3.sankeyLinkHorizontal())
+        .attr('stroke-width', d => Math.max(1, d.width))
+        .attr('stroke', '#999')
+        .attr('opacity', 0.25)
+        .append('title')
+        .text(d => `${d.source.fullName || d.source.name} → ${d.target.fullName || d.target.name}`);
+
+    // Draw nodes AFTER links (so they appear on top)
+    scaledGroup.append('g')
+      .selectAll('rect')
+      .data(nodes)
+      .enter().append('rect')
+        .attr('x', d => d.x0)
+        .attr('y', d => d.y0)
+        .attr('height', d => d.y1 - d.y0)
+        .attr('width', d => d.x1 - d.x0)
+        .attr('fill', d => {
+          // Color source nodes based on their CSV value (not display name)
+          if (d.layer === 'source' && d.csvValue) {
+            return sourceColors[d.csvValue] || '#4682b4';
+          }
+          // Default color for inference and recommendation nodes
+          return '#4682b4';
+        })
+        .append('title')
+        .text(d => d.fullName || d.name);
+
+    // **Add labels LAST (so they appear on top of everything)**
+    scaledGroup.append('g')
+      .selectAll('text')
+      .data(nodes)
+      .enter().append('text')
+        .attr('x', d => d.x0 - 6)
+        .attr('y', d => (d.y0 + d.y1) / 2)
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'end')
+        .text(d => d.name) // Display the friendly name
+        .style('font-size', '16px')
+        .style('pointer-events', 'none')
+        .append('title')
+        .text(d => d.fullName || d.name);
+  }
+
+  update(); // initial draw
+});
+</script>
+</body>
+</html>
