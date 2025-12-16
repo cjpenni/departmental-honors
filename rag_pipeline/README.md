@@ -16,5 +16,6 @@ Now you have a set of Amazon products with descriptions!
 
 Now you are ready for retrieval with Amazon Products!
 
-*Disclaimer*: You will need to change the paths in both scripts to reflect your setup before running
+*Disclaimer*: You will need to change the paths in both scripts to reflect your setup before running.
+
 Run both scripts as batch jobs using title_embed.sh. The last line `python create_faiss_index.py`, should be replaced with `python 1_embed_titles.py` and `python 2_create_faiss_index.py` respectively. Run one and then the other.
