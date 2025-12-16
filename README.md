@@ -3,6 +3,7 @@
 ## Setting up Env
 - run `module load miniforge3`
 - run `conda env create --prefix /scratch/username/departmental-honors/env-name`
+- run `/scratch/username/departmental-honors/env-name`
 - if running on palmetto cluster `sbatch install_torch.sh` (make sure to edit env path in the file before running)
 - then `pip install -r requirements.txt`
 
