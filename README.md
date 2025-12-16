@@ -1,7 +1,7 @@
 # departmental-honors
 
 ## Setting up Env
-- run `conda env create -n myenv`
+- run `conda env create --prefix /scratch/username/departmental-honors/env-name`
 - if running on palmetto cluster `sbatch install_torch.sh` (make sure to edit env path in the file before running)
 - then `pip install -r requirements.txt`
 
